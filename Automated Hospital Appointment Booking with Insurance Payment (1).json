@@ -1,0 +1,204 @@
+{
+  "name": "Automated Hospital Appointment Booking with Insurance Payment",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        496,
+        -80
+      ],
+      "id": "ec0e5a63-036e-40c7-9de7-b0dcae4bff8c",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "=paragkb.07@gmail.com",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "timeMax": "={{ $now.plus(24, 'hours') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        720,
+        -80
+      ],
+      "id": "fd857270-5eac-4897-9955-049954743ace",
+      "name": "Get many events",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "RSIsdetUJqGxAEnH",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Appointment Description: {{ $json.description }}\n\nStart time: {{ $json.start.dateTime }}\n\nEnd time: {{ $json.end.dateTime }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are Nexus from MediPilot. Generate a structred JSON obect with the following fields:\nname: full name of the recipient \nphone_number: Phone number for the appointment \nreason: Reason for appointment \nstart_time: Start time in IST 8601 date-time format\nend_time: End time in IST 8601 date-time format\nemail: Email address of the recipient \nReturn the output only in valid JSON format. Do not include any additional test or comments."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        944,
+        -80
+      ],
+      "id": "947451a8-e4b6-4153-9a1b-56d2ca5c3194",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n   \"type\":\"object\",\n  \"properties\":{\n    \"output\":{\n      \"type\":\"object\",\n      \"properties\":{\n        \"name\":{\n          \"type\":\"string\"\n        },\n        \"email\":{\n          \"type\":\"string\",\n          \"format\":\"email\"\n        },\n        \"phone_number\":{\n          \"type\":\"string\"\n        },\n        \"reason\":{\n          \"type\":\"string\"\n        },\n        \"start_time\":{\n          \"type\":\"string\",\n          \"format\":\"date-time\"\n        },\n        \"end_time\":{\n          \"type\":\"string\",\n          \"format\":\"date-time\"\n        }\n      },\n      \"required\":[\n        \"name\",\n        \"email\",\n        \"phone_number\",\n        \"reason\",\n        \"start_time\",\n        \"end_time\"\n      ]\n    }\n  },\n  \"required\":[\"output\"]\n}\n          ",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1024,
+        144
+      ],
+      "id": "0c772efe-60df-48d1-aeb5-ca5f77e641ea",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.retallai.com/v2/create-phone-call",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n{\n\"from_number\": \"+1636317374\",\n\"to_number\": \"6360182388\",\n\"retell_llm_dynamic_variables\": {\n\"name\": \"Thejus\",\n\"phone_number\": \"6360182388\",\n\"reason\": \"Appointment for regular check up\",\n\"start_time\": \"2025-11-29T09:45:00+05:30\",\n\"end_time\": \"2025-11-29T10:45:00+05:30\"\n},\n\"override_agent_id\": \"agent_8d0ab66f0d8d9d5ce3952acf7b\"\n}\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1392,
+        -80
+      ],
+      "id": "3559b454-4163-4718-9fa9-04e1e94db4cb",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "vvjnKtKaMYmqa2t7",
+          "name": "Custom Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        880,
+        224
+      ],
+      "id": "2e73c80f-28ca-42f6-b782-3285edaf2ba4",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "AXOULqeXDLepAG2K",
+          "name": "Google Gemini(PaLM) Api account 4"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many events": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Structured Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "850b299f-0db4-43ea-b1d7-d6b0bab4896f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b0a73257a4d36622b0aa56167fdb869c0fc6d30efdc1db706e25feb7332b59f4"
+  },
+  "id": "YwVR1T4hXeFGEavy",
+  "tags": []
+}
